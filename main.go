@@ -5,16 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/stonedz/bootdev-go-pokedex/internal/cache"
 	"io"
 	"net/http"
 	"os"
+	"time"
+
+	"github.com/stonedz/bootdev-go-pokedex/internal/cache"
 )
 
 type cliCommand struct {
 	command     string
 	description string
-	callback    func(conf *config) error
+	callback    func(conf *config, cache *cache.Cache) error
 }
 
 type config struct {
@@ -34,6 +36,7 @@ type mapLocations struct {
 
 func main() {
 	conf := config{Next: "", Prev: ""}
+	cache := cache.NewCache(10 * time.Second)
 	commands := make(map[string]cliCommand)
 	addCommand(commands, "help", "Prints the help message", commandHelp)
 	addCommand(commands, "exit", "Exits the program", commandExit)
@@ -45,18 +48,18 @@ func main() {
 		scanner := bufio.NewScanner(bufio.NewReader(os.Stdin))
 		scanner.Scan()
 		text := scanner.Text()
-		handleCommand(text, commands, &conf)
+		handleCommand(text, commands, &conf, cache)
 	}
 
 }
 
-func handleCommand(text string, commands map[string]cliCommand, conf *config) {
+func handleCommand(text string, commands map[string]cliCommand, conf *config, cache *cache.Cache) {
 	command, ok := commands[text]
 	if ok {
-		err := command.callback(conf)
+		err := command.callback(conf, cache)
 		if err != nil {
 			fmt.Println(err)
-			commandExit(conf)
+			commandExit(conf, cache)
 		}
 	} else {
 		fmt.Println("Command not found")
@@ -64,22 +67,22 @@ func handleCommand(text string, commands map[string]cliCommand, conf *config) {
 
 }
 
-func addCommand(commands map[string]cliCommand, command string, description string, callback func(conf *config) error) {
+func addCommand(commands map[string]cliCommand, command string, description string, callback func(conf *config, cache *cache.Cache) error) {
 
 	commands[command] = cliCommand{command, description, callback}
 }
 
-func commandHelp(conf *config) error {
+func commandHelp(conf *config, cache *cache.Cache) error {
 	fmt.Println("Help message")
 	return nil
 }
-func commandExit(conf *config) error {
+func commandExit(conf *config, cache *cache.Cache) error {
 	fmt.Println("Exiting...")
 	os.Exit(0)
 	return nil
 }
 
-func commandMap(conf *config) error {
+func commandMap(conf *config, cache *cache.Cache) error {
 	req := ""
 	if conf.Next != "" {
 		req = conf.Next
@@ -114,13 +117,13 @@ func commandMap(conf *config) error {
 	return nil
 }
 
-func commandMapb(conf *config) error {
+func commandMapb(conf *config, cache *cache.Cache) error {
 	fmt.Println("Mapb...")
 	if conf.Prev == "" {
 		return errors.New("No previous page!")
 	}
 
 	conf.Next = conf.Prev
-	commandMap(conf)
+	commandMap(conf, cache)
 	return nil
 }
